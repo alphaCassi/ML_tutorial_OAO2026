@@ -1,0 +1,550 @@
+
+# Main simulation parameters
+main:
+  class:             'SimulParams'
+  root_dir:          './calibration'       # CalibManager root directory (all the data are in subdirectories)
+  pixel_pupil:       120                   # Must match influence function computation
+  pixel_pitch:       0.015167              # [m] Pitch of the pupil phase array (1.82m/120pix)
+  total_time:      0.5 #                 # [s] Total simulation running time
+  time_step:         0.001                 # [s] Simulation time step
+  zenithAngleInDeg:  10.0                   # [deg] Zenith observation (0 means no airmass)
+  display_server:    false                 # Disable for batch runs
+
+# Atmospheric conditions
+seeing:
+  class:             'WaveGenerator'
+  constant:      2. #   1.5                  # [arcsec]
+
+wind_speed:
+  class:             'WaveGenerator'
+  constant:      [6.6, 5.9, 5.1, 4.5] #, 5.1, 8.3, 16.3, 30.2, 34.3, 17.5]    # [m/s] Multi-layer wind speeds
+  # constant:          [15.0, 13.0, 13.0, 9.0, 9.0, 15.0, 25.0, 40.0, 21.0]    # [m/s] Multi-layer wind speeds
+  # constant:          [2, 4, 6, 25]    # [m/s] Multi-layer wind speeds
+
+wind_direction:
+  class:             'WaveGenerator'
+  constant:       [38.0, 34.0, 54.0, 42.0] #, 68.0, 48.0, -102.0, -83.0, -77.0, 34.0] # [deg] Wind directions for each layer
+  # constant:          [38.0, 34.0, 54.0, 42.0, 57.0, 48.0, -102.0, -83.0, -77.0] # [deg] Wind directions for each layer
+  # constant:          [38, 162, -102, -45] # [deg] Wind directions for each layer
+
+# Natural guide star for WFS
+source_ngs:
+  class:             'Source'
+  polar_coordinates: [0.0, 0.0]            # [arcsec, deg] On-axis NGS
+  height:            .inf                  # Infinite height (star)
+  magnitude:       1.0 #   1.0                   # R-band magnitude (bright NGS)
+  wavelengthInNm:    750                   # [nm] R-band for WFS
+
+# Telescope pupil geometry
+pupilstop:
+  class:             'Pupilstop'
+  tag:               'DM468_120pixels' #'copernico_pupil_120pixels' 
+
+# Multi-layer atmospheric model
+atmo:
+  class:             'AtmoEvolution'
+  simul_params_ref:  'main'
+  L0:                25.0                   # [m] Outer scale
+  heights:        [110, 238, 402, 728] #, 1381, 2686, 5296, 9066, 12836, 16136] # [m] Ground, mid, high layers at 0 zenith angle
+  Cn2:     [0.7,0.1,0.1,0.1] #      [0.59, 0.02, 0.04, 0.06] #, 0.01, 0.05, 0.09, 0.04, 0.05, 0.05]        # Cn2 fractions (sum = 1.0)
+  # heights:           [103, 725, 2637, 11068] # [m] Ground, mid, high layers at 0 zenith angle
+  # Cn2:               [0.70, 0.06, 0.14, 0.10]        # Cn2 fractions (sum = 1.0)
+  fov:               0.0                    # [arcsec] Field of view
+  inputs:
+    seeing:          'seeing.output'
+    wind_speed:      'wind_speed.output'
+    wind_direction:  'wind_direction.output'
+  outputs:           ['layer_list']
+
+# Atmospheric propagation
+prop:
+  class:             'AtmoPropagation'
+  simul_params_ref:  'main'
+  doFresnel: false
+  padding_factor: 16
+  wavelengthInNm: 750
+  source_dict_ref:   ['source_ngs'] 
+  inputs:
+    atmo_layer_list: ['atmo.layer_list']
+    common_layer_list: ['pupilstop', 'dm1.out_layer:-1'] # ,'dm2.out_layer:-1' ]       # Pupil 'dm1.out_layer:-1' 
+  outputs:           ['out_source_ngs_ef'] 
+
+# ef_prop:
+#   class: 'ElectricFieldCombinator'
+#   inputs:
+#     in_ef1: 'prop.out_source_ngs_ef'    # Turbulence
+#     #in_ef2: 'dm.out_layer:-1'          # DM1 correction
+#     in_ef2:  'dm1.out_layer:-1' #, 'dm2.out_layer:-1']
+#     in_ef3: 'dm2.out_layer:-1'
+
+#   outputs: ['out_ef']
+
+
+########################### PWFS ##############################
+pyr:
+  class:             'ModulatedPyramid'
+  simul_params_ref:  'main'
+  pup_diam:          40.                     # Pupil diameter in subaps.
+  pup_dist:          60.                     # Separation between pupil centers in subaps.
+  fov:               4.0                     # Requested field-of-view [arcsec]
+  mod_amp:           7.0                     # Modulation radius (in lambda/D units)
+  output_resolution: 120                      # Output sampling [usually corresponding to CCD pixels]
+  wavelengthInNm:    750                     # [nm] Pyramid wavelength
+  inputs:
+   # in_ef: 'ef_prop.out_ef' #'prop.out_source_ngs_ef'
+    in_ef: 'prop.out_source_ngs_ef' #'prop.out_source_ngs_ef'
+
+ocam:
+  class:             'CCD'
+  simul_params_ref:  'main'
+  size:              [120,120]            # Total detector size
+  dt:         0.001 #       0.001              # [s] Integration time (2000 fps)
+  bandw:             300                   # [nm]
+  photon_noise:     true                  # Enable photon noise
+  readout_noise:    true                  # Enable read noise
+  excess_noise:      true                  # Enable excess noise
+  readout_level:     0.4                   # [e-/pix/frame] Read noise level
+  emccd_gain:        600                   # EMCCD gain factor
+  quantum_eff:       0.06                   # QE x transmission
+  inputs:
+    in_i:            'pyr.out_i' 
+  outputs:           ['out_pixels']
+
+pyr_slopes:
+  class:                  'PyrSlopec'
+  pupdata_object:         'pyr_pupdata_40x40'           
+  #sn_object:              'pyr7.0_40x40_sn' # Commented during calibration
+  slopes_from_intensity:  true
+  inputs:
+    in_pixels:        'ocam.out_pixels'
+  outputs:           ['out_slopes']
+
+pyr_modalrec:
+  class:             'Modalrec'
+  recmat_object:     'pyr7.0_40x40_400modes_rec'        
+  inputs:
+    in_slopes:       'pyr_slopes.out_slopes'
+  outputs:           ['out_modes']
+
+
+filter1: 
+  class:             'Integrator'
+ # simul_params_ref:  'main'
+  delay:       2. #      0.5  #1.5                    # Temporal delay in time steps
+  int_gain: [0.3, 0.2] #[0.4, 0.3] # [0.6, 0.5]    #  [1.0] #[0.7,0.6,0.0] #
+  ff:        [0.98, 0.987] #   [0.98]   #  [1.0]
+  n_modes:     [2, 398] #     [400] #
+  inputs:
+      delta_comm: 'pyr_modalrec.out_modes'  #'scaled_modes.out_value' # 
+
+# filter1:
+#   class:                'IirFilter'
+#   # simul_params_ref:     'main'
+#   delay:                1.0 # Total temporal delay in time steps is this value +1
+#   iir_filter_data_object: 'iir1' # 'ekarusiir_2modes'  #'ekarusiir_400modes_exc0_pow1.5' #'iirfilter_400modes' #'iirfilter_400modes_exc0_pow2.0' #  #'iirfilter_400modes_exc1_pow0.8'
+#   inputs:
+#     delta_comm: 'pyr_modalrec.out_modes' #'concat_wfs_modes.out_value' 
+#     gain_mod: 'gain_ramp1.output'
+#   outputs:  ['out_comm']
+
+# gain_ramp1:
+#   class:             'ScheduleGenerator'
+#   scheduled_values: [[0.6,0.], [1.2,0.]] #[1.15,0.975,0.775]]
+#   modes_per_group:  [2,398]
+#   scheduled_times: [0.01]
+
+
+# filter2:
+#   class:                'IirFilter'
+#   # simul_params_ref:     'main'
+#   delay:                1.0 # Total temporal delay in time steps is this value +1
+#   iir_filter_data_object: 'iir2' #'ekarusiir_2_400_modes'  #'ekarusiir_400modes_exc0_pow1.5' #'iirfilter_400modes' #'iirfilter_400modes_exc0_pow2.0' #  #'iirfilter_400modes_exc1_pow0.8'
+#   inputs:
+#     delta_comm: 'pyr_modalrec.out_modes' #'concat_wfs_modes.out_value' 
+#     gain_mod: 'gain_ramp2.output'
+#   outputs:  ['out_comm']
+
+# gain_ramp2:
+#   class:             'ScheduleGenerator'
+#   scheduled_values: [[0., 0.4,0.2,0.1], [0.,1.1,0.85,0.7]] #[1.15,0.975,0.775]]
+
+#   modes_per_group: [2,298,50,50]
+#   scheduled_times: [0.01]
+
+
+
+# # Seleziona i primi 2 modi (TT)
+# mode_sel_tt:
+#   class: 'ModeSelector'
+#   start_mode: 0
+#   nmodes: 2
+#   inputs:
+#     in_modes: 'pyr_modalrec.out_modes'
+#   outputs: ['out_modes']
+
+# # Seleziona modi 2-399 (HO)
+# mode_sel_ho:
+#   class: 'ModeSelector'
+#   start_mode: 2
+#   nmodes: 398
+#   inputs:
+#     in_modes: 'pyr_modalrec.out_modes'
+#   outputs: ['out_modes']
+
+# filter1:
+#   class: 'IirFilter'
+#   delay: 1.0
+#   iir_filter_data_object: 'iir1'
+#   inputs:
+#     delta_comm: 'mode_sel_tt.out_modes'   # ← solo 2 modi
+#     gain_mod: 'gain_ramp1.output'
+#   outputs: ['out_comm']
+
+# filter2:
+#   class: 'IirFilter'
+#   delay: 1.0
+#   iir_filter_data_object: 'iir2'
+#   inputs:
+#     delta_comm: 'mode_sel_ho.out_modes'   # ← solo 398 modi
+#     gain_mod: 'gain_ramp2.output'
+#   outputs: ['out_comm']
+
+
+
+# filter1: 
+#   class:             'Integrator'
+#  # simul_params_ref:  'main'
+#   delay:       2. #      0.5  #1.5                    # Temporal delay in time steps
+#   int_gain:  [0.4, 0.]    #  [1.0] #[0.7,0.6,0.0] #
+#   ff:        [0.98, 0] #   [0.98]   #  [1.0]
+#   n_modes:     [2, 398] #     [400] #
+#   inputs:
+#       delta_comm: 'pyr_modalrec.out_modes'  #'scaled_modes.out_value' # 
+
+
+# filter2: 
+#   class:             'Integrator'
+#  # simul_params_ref:  'main'
+#   delay:        1. #     0.5  #1.5                    # Temporal delay in time steps
+#   int_gain:  [0, 0.5]    #  [1.0] #[0.7,0.6,0.0] #
+#   ff:        [0, 0.98] #   [0.98]   #  [1.0]
+#   n_modes:     [2, 398] #     [400] #
+#   inputs:
+#       delta_comm: 'pyr_modalrec.out_modes'  #'scaled_modes.out_value' # 
+
+# omgi:
+#    class: 'CloseGainOptimizer'
+#    nmodes: 400
+#    p: 0.2
+#    r: -0.3
+#    dt: 4                # Time-shift in frames: 2x(delay+1)-1
+#    q_plus: 0.01        # Tracking gain increase factor
+#    q_minus_ratio: 5.0  # Ratio of q- to q+ (for overshoots)
+#    initial_gain: 0.5
+#    inputs:
+#      in_modes:  'pyr_modalrec.out_modes'
+#    outputs: ['out_gains']
+
+# scaled_modes:
+#   class: 'BaseOperation'
+#   mul: true
+#   inputs:
+#     in_value1: 'pyr_modalrec.out_modes'
+#     in_value2: 'omgi.out_gains'
+#   outputs: ['out_value']
+
+
+# filter:
+#   class:                'IirFilter'
+#   simul_params_ref:     'main'
+#   delay:                1.5 # Total temporal delay in time steps is this value +1
+#   iir_filter_data_object: 'ekarusiir_400modes_exc0_pow1.5' #'iirfilter_400modes' #'iirfilter_400modes_exc0_pow2.0' #  #'iirfilter_400modes_exc1_pow0.8'
+#   inputs:
+#     delta_comm: 'pyr_modalrec.out_modes' #'concat_wfs_modes.out_value' 
+#     gain_mod: 'gain_ramp.output'
+#   outputs:  ['out_comm']
+
+# gain_ramp:
+#   class:             'ScheduleGenerator'
+#   scheduled_values: [[0.6,0.4,0.2,0.1], [1.4,1.1,0.85,0.7]] #[1.15,0.975,0.775]]
+#   modes_per_group: [150,150,50,50]
+#   scheduled_times: [0.01]
+
+# gain_ramp:
+#   class:             'ScheduleGenerator'
+#   scheduled_values: [[0.1],[0.9]]
+#   modes_per_group: [400]
+#   scheduled_times: [0.01]
+
+
+# dm0:
+#   class:             'DM'
+#   simul_params_ref:  'main'
+#   ifunc_object:      'DM468_ifunc' #'dm468_ifunc'      # Influence functions
+#   m2c_object:        'DM468_m2c' #'dm468_m2c'        # Modal-to-command matrix
+#   height:            0                # Ground-conjugated DM
+#   nmodes:            400
+#   inputs:
+#     in_command:      'filter.out_comm'
+#   outputs:           ['out_layer']
+
+# slicer1: &SLICER
+#   class:          'BaseSlicer'
+#   slice_args:     [0,2]  ####820??????????
+#   inputs:
+#     in_value: 'filter.out_comm' #'modal_combination.out_vector'
+#   outputs:  ['out_value']
+
+# slicer2: { <<: *SLICER, slice_args: [3,400]}
+
+
+# dm1:
+#   class:             'DM'
+#   simul_params_ref:  'main'
+#   ifunc_object:      'DM468_ifunc' #'dm468_ifunc'      # Influence functions
+#   m2c_object:        'DM468_m2c' #'dm468_m2c'        # Modal-to-command matrix
+#   height:            0                # Ground-conjugated DM
+#   nmodes:            400
+#   inputs:
+#     in_command:     'filter1.out_comm' # "slicer1.out_value"
+#   outputs:           ['out_layer']
+
+
+# dm2:
+#   class:             'DM'
+#   simul_params_ref:  'main'
+#   ifunc_object:      'DM468_ifunc' #'dm468_ifunc'      # Influence functions
+#   m2c_object:        'DM468_m2c' #'dm468_m2c'        # Modal-to-command matrix
+#   height:            0                # Ground-conjugated DM
+#   nmodes:            400
+#   inputs:
+#     in_command: 'filter2.out_comm' #   "slicer2.out_value"         # 'filter.out_comm'
+#   outputs:           ['out_layer']
+
+
+# --- FILTER TT (modi 0-1) ---
+# temporal_filter1:
+#   class:    'IirFilterData'
+#   ordnum:   [2]
+#   ordden:   [2]
+#   num:      [[0.0, 0.5, 0.0]]    # integrator puro, gain applicato da gain_ramp1
+#   den:      [[-0.99, 1.0, 0.0]]  # leaky integrator (ff=0.99)
+#   n_modes:  [2]
+
+
+###################################################################
+# filter1:
+#   class:               'IirFilter'
+#   delay:               1.0
+#   iir_filter_data_object:   ekarusiir_400modes_exc0_pow1.5.fits #'temporal_filter1'   # ← ref inline, no .fits!
+#   inputs:
+#     delta_comm: 'scaled_modes.out_value' # 'pyr_modalrec.out_modes'    # tutti 400 modi in input...
+#     gain_mod:   'gain_ramp1.output'
+#   outputs: ['out_comm']
+
+# gain_ramp1:
+#   class:            'ScheduleGenerator'
+#   scheduled_values: [[0.5, 0.0], [1.0, 0.0]]   # gain solo sui primi 2
+#   modes_per_group:  [2, 398]                     # gruppo TT=2, HO=398 con gain 0
+#   scheduled_times:  [0.01]
+
+
+
+# omgi1:
+#    class:    'GainOptimizer'  #  'GainOptimizer' 
+#   #  nmodes: 2
+#   #  p: 0.2
+#   #  r: -0.3
+#   #  dt: 4                # Time-shift in frames: 2x(delay+1)-1
+#   #  q_plus: 0.01        # Tracking gain increase factor
+#   #  q_minus_ratio: 5.0  # Ratio of q- to q+ (for overshoots)
+#   #  initial_gain: 0.5
+#    simul_params_ref:  'main'
+#    iir_filter_data:   'ekarusiir_400modes_exc0_pow1.5.fits' #'temporal_fi
+#    opt_dt: 0.05  # s
+#    delay: 2. #frames
+
+#    inputs:
+#      in_modes:  'pyr_modalrec.out_modes'
+#    outputs: ['out_gains']
+
+# scaled_modes:
+#   class: 'BaseOperation'
+#   mul: true
+#   inputs:
+#     in_value1: 'pyr_modalrec.out_modes'
+#     in_value2: 'omgi1.out_gains'
+#   outputs: ['out_value']
+
+# # --- FILTER HO (modi 2-399) ---
+# # temporal_filter2:
+# #   class:    'IirFilterData'
+# #   ordnum:   [2,          2,          2,          2]
+# #   ordden:   [2,          2,          2,          2]
+# #   num:      [[0.0, 0.5, 0.0], [0.0, 0.5, 0.0], [0.0, 0.5, 0.0], [0.0, 0.5, 0.0]]
+# #   den:      [[-0.99, 1.0, 0.0], [-0.98, 1.0, 0.0], [-0.97, 1.0, 0.0], [-0.96, 1.0, 0.0]]
+# #   n_modes:  [2, 298, 50, 50]    # 2+298+50+50 = 400, ma i primi 2 avranno gain 0
+
+# filter2:
+#   class:               'IirFilter'
+#   delay:               1.0
+#   iir_filter_data_object: 'ekarusiir_400modes_exc0_pow1.5.fits' # 'temporal_filter2'
+#   inputs:
+#     delta_comm: 'pyr_modalrec.out_modes'
+#     gain_mod:   'gain_ramp2.output'
+#   outputs: ['out_comm']
+
+# gain_ramp2:
+#   class:            'ScheduleGenerator'
+#   scheduled_values: [[0.0, 0.4, 0.2, 0.1], [0.0, 1.1, 0.85, 0.7]]
+#   modes_per_group:  [2, 298, 50, 50]    # primi 2 modi con gain 0 (li gestisce filter1)
+#   scheduled_times:  [0.01]
+
+####################################################
+
+# --- DM ---
+dm1:
+  class:           'DM'
+  simul_params_ref: 'main'
+  ifunc_object:    'DM468_ifunc'
+  m2c_object:      'DM468_m2c'
+  height:          0
+  nmodes:          400
+  inputs:
+    in_command: 'filter1.out_comm'
+  outputs: ['out_layer']
+
+# dm2:
+#   class:           'DM'
+#   simul_params_ref: 'main'
+#   ifunc_object:    'DM468_ifunc'
+#   m2c_object:      'DM468_m2c'
+#   height:          0
+#   nmodes:          400
+#   inputs:
+#     in_command: 'filter2.out_comm'
+#   outputs: ['out_layer']
+
+###########################################################
+##################### POST-PROCESSING #####################
+# Coronagraphic and non-coronagraphic PSFs
+psf:
+  class:             'PSF'
+  simul_params_ref:  'main'
+  wavelengthInNm:    750                 # [nm] visible
+  nd:              8 #  4                    # 4x padding for PSF
+  start_time:        0.05                # Start PSF integration after 500ms
+  compute_profile_metrics: True
+  compute_metrics_in_trigger: True
+  ee_radius_in_lambda_d: 4
+ # verbose: true
+  inputs:
+ #   in_ef:           'ef_prop.out_ef'
+    in_ef:  'prop.out_source_ngs_ef'
+  outputs:           ['out_psf', 'out_std_psf', 'out_sr']
+
+# coro_psf:
+#   class:             'PsfCoronagraph'
+#   simul_params_ref:  'main'
+#   wavelengthInNm:    750                 # [nm] visible
+#   nd:                4                   # 4x padding for PSF
+#   start_time:        0.5                 # Start PSF integration after 500ms
+#   verbose: false
+#   # use_average_field: false
+#   compute_profile_metrics: true
+#   inputs:
+#     in_ef:           'ef_prop.out_ef' 
+ 
+
+dm_mode_res:
+  class:            'ModalAnalysis'
+  ifunc_inv_object: 'DM468_kl_inv'
+  inputs:
+  #  in_ef: ['ef_prop.out_ef']
+    in_ef: ['prop.out_source_ngs_ef']
+  outputs: ['out_modes']
+
+atmo_modes:
+  class:            'ModalAnalysis'
+  ifunc_inv_object: 'DM468_kl_inv'
+  inputs:
+    in_ef: ['prop.out_source_ngs_ef']
+  outputs: ['out_modes']
+
+# Data store for results
+data_store:
+  class:             'DataStore'
+  store_dir:         './output' # raid1/mmenessini/results/EKARUS'             # Data result directory: 'store_dir'/TN/
+  data_format:       'fits'
+  inputs:
+    input_list: [
+                  # 'atmo_phase-ef_prop.out_ef',
+                  
+                  # 'coro_psf-coro_psf.out_std_coronagraph_psf_profile',
+                  'psfint-psf.out_int_psf',
+                  'comm-filter1.out_comm',
+
+                  'sr-psf.out_sr',
+                  'sr_int-psf.out_int_sr',
+
+                  'psffwhm_int-psf.out_int_psf_fwhm',
+                  'psffwhm-psf.out_psf_fwhm',
+
+                  'psfee_int-psf.out_int_encircled_energy_at_radius',
+                  'psfee-psf.out_encircled_energy_at_radius'
+
+                  # 'psf_std-psf.out_std_psf',
+                  # 'atmo_res-atmo_modes.out_modes',
+                  # 'dm_res-dm_mode_res.out_modes',
+               #   'dm_cmd-filter.out_comm',
+                  # 'pyr_modes-pyr_modalrec.out_modes',
+                  # 'opt_gains-omgi.out_gains',
+                  # 'ccd-ocam.out_pixels',
+                  ]
+
+ph_display:
+  class:            'PhaseDisplay'
+  inputs:
+    phase:       'prop.out_source_ngs_ef'
+  title:            'PUPIL PHASE'
+
+
+# remove: ['']
+psf_disp:
+  class:            'PsfDisplay'
+  log_scale: True
+  inputs:
+    psf:       "psf.out_psf"
+  title:            'PSF'
+  figsize:       [8, 6]  # Default size in inches
+
+dm_disp:
+  class: 'PhaseDisplay'
+  inputs:
+    phase: 'dm1.out_layer'
+  title: "DM"
+  figsize:       [8, 6]  # Default size in inches
+
+# # slicer_modal:
+# #   class: 'ModesDisplay'
+# #   inputs:
+# #     modes: 'slicer1.out_value'
+# #   title: "Slicer"
+
+# filter1_modal:
+#   class: 'ModesDisplay'
+#   inputs:
+#     modes: 'filter1.out_comm'
+#   title:            'filter1_rec'
+
+# filter2_modal:
+#   class: 'ModesDisplay'
+#   inputs:
+#     modes: 'filter2.out_comm'
+#   title:            'filter2_rec'
+
+# modes_disp:
+#   class: 'ModesDisplay'
+#   inputs:
+#     modes: 'dm_mode_res.out_modes'
+  
