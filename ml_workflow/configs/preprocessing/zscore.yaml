@@ -1,0 +1,6 @@
+input:
+  log: true
+  normalization: zscore
+
+output:
+  normalization: zscore

@@ -1,0 +1,4 @@
+train: false
+test: true
+
+checkpoint: checkpoints/best.ckpt

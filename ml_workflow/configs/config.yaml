@@ -1,0 +1,38 @@
+defaults:
+  - mode: train_test
+  - preprocessing: zscore
+  - model: dense_nn
+  - optimizer: adam
+  - loss: mse
+  
+  - _self_
+
+dataset:
+  root_data: "/home/lucacor/PHD/OAO school Asiago 2026/DATASET_SPECULA/output/parameter_sweep/"
+
+
+
+train:
+  split_random_seed: 42
+  train_ratio: 0.9
+  epochs: 10
+  batch_size: 512
+  num_workers: 16
+
+  device: cpu
+
+  path_checkpoint_folder: "best_checkpoint"
+
+
+val:
+  val_ratio: 0.05
+  batch_size: 32
+  num_workers: 8
+
+  # device: cuda
+
+test:
+  batch_size: 1
+  num_workers: 8
+
+  device: cpu
