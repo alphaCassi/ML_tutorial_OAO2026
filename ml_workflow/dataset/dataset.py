@@ -22,7 +22,7 @@ class AOdataset(Dataset):
         self.cfg = cfg
         self.root = cfg.dataset.root_data
         self.paths = sorted(glob.glob(os.path.join(self.root, 
-                                        #  "gpu*", 
+                                         #"gpu*", 
                                          "sim_*", 
                                          "*")))
         self.normalizer = normalizer
@@ -40,7 +40,7 @@ class AOdataset(Dataset):
         X3 = torch.tensor(load_psffwhm_int(root=self.paths[idx]), dtype = torch.float32)
         y = torch.tensor(load_atm_params(root=self.paths[idx]), dtype = torch.float32)
 
-        X = torch.cat((X1, X2, X3))
+        X = torch.cat((X1, X2, X3)).flatten()
 
         if self.normalizer is not None:
             

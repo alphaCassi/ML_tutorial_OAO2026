@@ -1,0 +1,31 @@
+
+Zonal influence functions:
+Valid actuators: 458/576 (79.5%)
+Pupil pixels: 9873/14400 (68.6%)
+Influence functions shape: (458, 9873)
+
+Generating KL modal basis...
+KL basis shape: (457, 9873)
+Number of KL modes: 457
+
+Saving influence functions and modal basis...
+OK: ./calibration/ifunc/tutorial_ifunc.fits (zonal influence functions)
+OK: ./calibration/m2c/tutorial_m2c.fits (KL modal basis)
+
+Saving inverse modal base...
+OK: ./calibration/ifunc/tutorial_base_inv.fits (inverse modal base)
+
+Generating visualization...
+
+Influence functions and modal basis computation completed!
+Files saved using CalibManager in: ./calibration
+
+Files created:
+  ifunc/DM468_ifunc.fits      - Zonal influence functions (458 actuators)
+  m2c/DM468_m2c.fits          - KL modal basis (457 modes)
+  ifunc/DM468_base_inv.fits   - Inverse modal base
+
+Testing file loading...
+OK: IFunc loading test passed
+OK: M2C loading test passed
+(specula) lucacor@lucacor-Th

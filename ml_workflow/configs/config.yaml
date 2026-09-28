@@ -8,7 +8,7 @@ defaults:
   - _self_
 
 dataset:
-  root_data: "/home/lucacor/PHD/OAO school Asiago 2026/DATASET_SPECULA/output/parameter_sweep/"
+  root_data: "/workspace/ML_tutorial_OAO2026/dataset_specula_ekarus/output/parameter_sweep/"
 
 
 
@@ -19,7 +19,7 @@ train:
   batch_size: 512
   num_workers: 16
 
-  device: cpu
+  device: cuda
 
   path_checkpoint_folder: "best_checkpoint"
 

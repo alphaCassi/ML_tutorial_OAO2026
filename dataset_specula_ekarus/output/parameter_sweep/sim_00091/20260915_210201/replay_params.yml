@@ -1,0 +1,182 @@
+main:
+  class: SimulParams
+  root_dir: ./calibration
+  pixel_pupil: 120
+  pixel_pitch: 0.015167
+  total_time: 0.5
+  time_step: 0.001
+  zenithAngleInDeg: 31.53010025545769
+  display_server: false
+seeing:
+  class: WaveGenerator
+  constant: 1.1701359517350451
+wind_speed:
+  class: WaveGenerator
+  constant:
+  - 15.594860376746643
+  - 10.284555960473227
+  - 16.37760604861296
+  - 61.60560852904261
+wind_direction:
+  class: WaveGenerator
+  constant:
+  - 122.48502791080905
+  - 90.22021967576038
+  - 121.45879156540619
+  - 41.291704725215446
+source_ngs:
+  class: Source
+  polar_coordinates:
+  - 0.0
+  - 0.0
+  height: .inf
+  magnitude: 3.341862831689238
+  wavelengthInNm: 750
+pupilstop:
+  class: Pupilstop
+  tag: DM468_120pixels
+atmo:
+  class: AtmoEvolution
+  simul_params_ref: main
+  L0: 28.13966235380061
+  heights:
+  - 110
+  - 238
+  - 402
+  - 728
+  Cn2:
+  - 0.6957316325417306
+  - 0.059785975722308995
+  - 0.14110287676574151
+  - 0.1033795149702189
+  fov: 0.0
+  inputs:
+    seeing: seeing.output
+    wind_speed: wind_speed.output
+    wind_direction: wind_direction.output
+  outputs:
+  - layer_list
+  seed: 92
+prop:
+  class: AtmoPropagation
+  simul_params_ref: main
+  doFresnel: false
+  padding_factor: 16
+  wavelengthInNm: 750
+  source_dict_ref:
+  - source_ngs
+  inputs:
+    atmo_layer_list:
+    - atmo.layer_list
+    common_layer_list:
+    - pupilstop
+    - dm1.out_layer:-1
+  outputs:
+  - out_source_ngs_ef
+pyr:
+  class: ModulatedPyramid
+  simul_params_ref: main
+  pup_diam: 40.0
+  pup_dist: 60.0
+  fov: 4.0
+  mod_amp: 7.0
+  output_resolution: 120
+  wavelengthInNm: 750
+  inputs:
+    in_ef: prop.out_source_ngs_ef
+ocam:
+  class: CCD
+  simul_params_ref: main
+  size:
+  - 120
+  - 120
+  dt: 0.001
+  bandw: 300
+  photon_noise: true
+  readout_noise: true
+  excess_noise: true
+  readout_level: 0.4
+  emccd_gain: 600
+  quantum_eff: 0.06
+  inputs:
+    in_i: pyr.out_i
+  outputs:
+  - out_pixels
+pyr_slopes:
+  class: PyrSlopec
+  pupdata_object: pyr_pupdata_40x40
+  slopes_from_intensity: true
+  inputs:
+    in_pixels: ocam.out_pixels
+  outputs:
+  - out_slopes
+pyr_modalrec:
+  class: Modalrec
+  recmat_object: pyr7.0_40x40_400modes_rec
+  inputs:
+    in_slopes: pyr_slopes.out_slopes
+  outputs:
+  - out_modes
+dm1:
+  class: DM
+  simul_params_ref: main
+  ifunc_object: DM468_ifunc
+  m2c_object: DM468_m2c
+  height: 0
+  nmodes: 400
+  inputs:
+    in_command: data_source.comm
+  outputs:
+  - out_layer
+dm_mode_res:
+  class: ModalAnalysis
+  ifunc_inv_object: DM468_kl_inv
+  inputs:
+    in_ef:
+    - prop.out_source_ngs_ef
+  outputs:
+  - out_modes
+atmo_modes:
+  class: ModalAnalysis
+  ifunc_inv_object: DM468_kl_inv
+  inputs:
+    in_ef:
+    - prop.out_source_ngs_ef
+  outputs:
+  - out_modes
+ph_display:
+  class: PhaseDisplay
+  inputs:
+    phase: prop.out_source_ngs_ef
+  title: PUPIL PHASE
+psf_disp:
+  class: PsfDisplay
+  log_scale: true
+  inputs:
+    psf: psf.out_psf
+  title: PSF
+  figsize:
+  - 8
+  - 6
+dm_disp:
+  class: PhaseDisplay
+  inputs:
+    phase: dm1.out_layer
+  title: DM
+  figsize:
+  - 8
+  - 6
+data_source:
+  class: DataSource
+  outputs:
+  - psfint
+  - comm
+  - sr
+  - sr_int
+  - psffwhm_int
+  - psffwhm
+  - psfee_int
+  - psfee
+  data_format: fits
+  store_dir: ./output/parameter_sweep/sim_00091/20260915_210201
+  global_precision: 1

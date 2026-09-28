@@ -1,0 +1,41 @@
+mode:
+  train: true
+  test: true
+  checkpoint: checkpoints/best.ckpt
+preprocessing:
+  input:
+    log: true
+    normalization: zscore
+  output:
+    normalization: zscore
+model:
+  _target_: models.dense_nn.DenseNN
+  neurons_first_hidden_layers: 1024
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.999
+  weight_decay: 0
+loss:
+  _target_: torch.nn.MSELoss
+  reduction: mean
+dataset:
+  root_data: /workspace/MLtutorial/ML_tutorial_OAO2026/dataset_specula_ekarus/output/parameter_sweep/
+train:
+  split_random_seed: 42
+  train_ratio: 0.9
+  epochs: 10
+  batch_size: 512
+  num_workers: 16
+  device: cuda
+  path_checkpoint_folder: best_checkpoint
+val:
+  val_ratio: 0.05
+  batch_size: 32
+  num_workers: 8
+test:
+  batch_size: 1
+  num_workers: 8
+  device: cpu
