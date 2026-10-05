@@ -1,1 +1,3 @@
 - add a part on basic stuff about NN?
+- we need to tell them to create a virtual environment (or use uv)
+- add equation for seeing (Fried parameter) and L0 (power spectral density)
